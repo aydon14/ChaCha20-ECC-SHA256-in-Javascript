@@ -85,21 +85,23 @@ function clampR(r) {
 }
 
 function poly1305Mac(key, msg) {
-    let r = Array.from(key.slice(0, 16));
+    const r = Array.from(key.slice(0, 16));
     clampR(r);
-    const s = BigInt(key.readUInt32LE(16));
+    
+    const rVal = BigInt('0x' + Buffer.from(r).reverse().toString('hex'));
+    const sVal = BigInt('0x' + key.slice(16, 32).reverse().toString('hex'));
 
     const p = BigInt('0x3fffffffffffffffffffffffffffffffb');
     let acc = 0n;
-
+    
     for (let i = 0; i < msg.length; i += 16) {
         const block = Buffer.concat([msg.slice(i, i + 16), Buffer.from([1])]);
-        const n = BigInt('0x' + block.reverse().toString('hex'));  // Ensure little-endian
-        const rVal = BigInt('0x' + Buffer.from(r).reverse().toString('hex')); // Ensure little-endian
+        const n = BigInt('0x' + block.reverse().toString('hex'));
+
         acc = (acc + n) * rVal % p;
     }
 
-    acc = (acc + s) % (1n << 128n);
+    acc = (acc + sVal) % (1n << 128n);
 
     const accBuf = Buffer.alloc(16);
     accBuf.writeBigUInt64LE(acc & BigInt('0xffffffffffffffff'), 0);
@@ -107,6 +109,7 @@ function poly1305Mac(key, msg) {
 
     return accBuf;
 }
+
 
 
 function pad16(data) {
@@ -167,30 +170,43 @@ function decrypt(key, iv, ciphertext, aad, tag) {
 const crypto = require('crypto'); // For comparison with Node.js built-in crypto
 
 function testChaCha20Poly1305() {
-    const key = Buffer.from('0000000000000000000000000000000000000000000000000000000000000000', 'hex'); // 32-byte key
-    const iv = Buffer.from('000000000000000000000000', 'hex');       // 12-byte IV
-    const plaintext = Buffer.from('This is a test message.', 'utf-8'); // Plaintext
-    const aad = Buffer.from('Additional authenticated data.', 'utf-8'); // AAD
+    const iterations = 100;
+    for (let i = 0; i < iterations; i++) {
+        const key = crypto.randomBytes(32);
+        const iv = crypto.randomBytes(12);
+        const aad = crypto.randomBytes(Math.floor(Math.random() * 32));
+        const plaintext = crypto.randomBytes(Math.floor(Math.random() * 256));
 
-    const { ciphertext, tag } = encrypt(key, iv, plaintext, aad);
+        const { ciphertext, tag } = encrypt(key, iv, plaintext, aad);
 
-    console.log('Ciphertext:', ciphertext.toString('hex'));
-    console.log('Tag:', tag);
+        const cipher = crypto.createCipheriv('chacha20-poly1305', key, iv);
+        cipher.setAAD(aad);
+        const encrypted = Buffer.concat([cipher.update(plaintext), cipher.final()]);
+        const tagCrypto = cipher.getAuthTag();
+        const { plaintext: decryptedText, warning } = decrypt(key, iv, ciphertext, aad, tag);
 
-    const cipher = crypto.createCipheriv('chacha20-poly1305', key, iv);
-    cipher.setAAD(aad);
-    const encrypted = Buffer.concat([cipher.update(plaintext), cipher.final()]);
-    const tagCrypto = cipher.getAuthTag();
+        // Optional Debug
+        // console.log(`Test ${i + 1}:`);
+        // console.log('Ciphertext (custom):', ciphertext.toString('hex'));
+	// console.log('Ciphertext (crypto):', encrypted.toString('hex'));
+        // console.log('Tag (custom):', tag);
+        // console.log('Tag (crypto):', tagCrypto.toString('hex'));
+	// console.log('plaintext:', plaintext.toString('hex'));
+        // console.log('Decrypted plaintext:', decryptedText.toString('hex'));
 
-    console.log('Ciphertext (crypto):', encrypted.toString('hex'));
-    console.log('Tag (crypto):', tagCrypto.toString('hex'));
+        if (warning) {
+            console.warn('Warning during decryption:', warning);
+        }
 
-    const { plaintext: decryptedText, warning } = decrypt(key, iv, ciphertext, aad, tag);
-
-    console.log('Decrypted plaintext:', decryptedText.toString('utf-8'));
-
-    if (warning) {
-        console.warn(warning);
+        if (!decryptedText.equals(plaintext)) {
+            console.error('Decryption mismatch for test', i + 1);
+        } else if (!ciphertext.equals(encrypted)) {
+            console.error('Ciphertext mismatch for test', i + 1);
+        } else if (!tag == tagCrypto.toString('hex')) {
+	    console.error('Tag mismatch for test', i + 1);
+	} else {
+            console.log(`Test ${i + 1} passed.`);
+        }
     }
 }
 
