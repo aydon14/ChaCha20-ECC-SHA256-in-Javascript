@@ -2,8 +2,6 @@
 
 [NOTE] I plan on updating this in the future, but for right now, you need to create 2 seperate chacha20 classes for encryption and decryption like in the test function.
 
-Hey yall! I am creating this repository as I made a replica Chacha20-Poly1305 implementation in Javascript for my upcoming game.
-
 I decided to make this a public repository as some of you will find it useful.
 
 I recommend running it using node.js, as that is the platform this was made for. 
