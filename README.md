@@ -1,7 +1,8 @@
 # Chacha20-Poly1305-in-Javascript
 
 [NOTE] I plan on updating this in the future, but for right now, you need to create 2 seperate chacha20 objects for encryption and decryption like in the test function.
-[NOTE] Update 10/14/24: You also need to create seperate ECCops objects when generating the chacha20 keys as well.
+
+Update 10/14/24: You also need to create seperate ECCops objects when generating the chacha20 keys as well.
 
 I decided to make this a public repository as some of you will find it useful.
 
